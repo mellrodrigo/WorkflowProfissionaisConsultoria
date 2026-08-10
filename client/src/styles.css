@@ -53,6 +53,20 @@ button.ghost { background: transparent; color: var(--text); border: 1px solid va
 button.danger { background: var(--bad); color: #fff; border: 0; padding: 9px 16px; border-radius: 8px; font-weight: 600; }
 button.danger.ghost { background: transparent; color: var(--bad); border: 1px solid var(--bad); }
 
+.header-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+.who { color: var(--muted); font-size: 13px; }
+.loading { padding: 40px; text-align: center; color: var(--muted); }
+
+/* --- Tela de login --- */
+.login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.login-card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+  padding: 28px; width: min(380px, 100%);
+}
+.login-card h1 { margin: 0 0 4px; font-size: 20px; }
+.login-sub { margin: 0 0 18px; color: var(--muted); font-size: 13px; }
+.login-btn { width: 100%; margin-top: 18px; }
+
 /* --- Seletor de trilha --- */
 .tracks { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
 .tracks > button {

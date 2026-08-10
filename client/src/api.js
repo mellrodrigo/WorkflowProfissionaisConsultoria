@@ -1,14 +1,21 @@
 // Wrapper simples sobre fetch para a API do backend.
 const BASE = '/api';
 
+// Avisa a aplicação quando a sessão expira, para voltar à tela de login em vez
+// de exibir um erro solto em cada requisição.
+let onUnauthorized = () => {};
+export function setUnauthorizedHandler(fn) { onUnauthorized = fn; }
+
 async function req(path, opts = {}) {
-  const res = await fetch(BASE + path, opts);
+  // credentials garante o envio do cookie de sessão.
+  const res = await fetch(BASE + path, { credentials: 'same-origin', ...opts });
   if (!res.ok) {
     let msg = `Erro ${res.status}`;
     try {
       const body = await res.json();
       if (body.error) msg = body.error;
     } catch (_) { /* ignore */ }
+    if (res.status === 401 && !path.startsWith('/auth/')) onUnauthorized();
     throw new Error(msg);
   }
   if (res.status === 204) return null;
@@ -23,6 +30,12 @@ const json = (method, body) => ({
 });
 
 export const api = {
+  login: (username, password) => req('/auth/login', json('POST', { username, password })),
+  logout: () => req('/auth/logout', { method: 'POST' }),
+  me: () => req('/auth/me'),
+  changePassword: (current_password, new_password) =>
+    req('/auth/password', json('POST', { current_password, new_password })),
+
   workflows: () => req('/workflows'),
   listCases: (type) => req(`/cases${type ? `?type=${type}` : ''}`),
   getCase: (id) => req(`/cases/${id}`),

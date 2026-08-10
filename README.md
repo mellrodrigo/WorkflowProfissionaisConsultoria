@@ -55,6 +55,9 @@ e podem ser reabertos — voltando à etapa em que estavam antes do encerramento
 
 ## Funcionalidades
 
+- **Acesso protegido por login**: usuário e senha, sessão em cookie `httpOnly`,
+  senhas com hash `scrypt`. Toda a API exige sessão válida — inclusive o
+  download de currículos.
 - **Quadro Kanban** por trilha, com uma coluna por etapa e contadores de casos.
 - **Avanço de etapas** com observação por transição e **histórico completo**
   (quem saiu de onde, para onde, quando e com qual observação).
@@ -94,11 +97,17 @@ npm run install:all
 # 2. Gerar o build do frontend
 npm run build
 
-# 3. Subir a aplicação (API + interface na mesma porta)
+# 3. Criar o primeiro usuário de acesso (sem isso não há como entrar)
+npm --prefix server run create-user -- rodrigo 'umaSenhaForte' 'Rodrigo Mello'
+
+# 4. Subir a aplicação (API + interface na mesma porta)
 npm start
 ```
 
-Acesse **http://localhost:4000**.
+Acesse **http://localhost:4000** e entre com o usuário criado.
+
+O mesmo comando `create-user`, repetido para um usuário existente, redefine a
+senha — é o caminho para recuperar acesso.
 
 ### Modo desenvolvimento
 
@@ -136,10 +145,15 @@ criar registros vazios. Limite de 25 MB por arquivo.
 
 ## API
 
-Base: `/api`
+Base: `/api`. Todas as rotas exigem sessão autenticada, exceto `/api/health` e
+`/api/auth/login`.
 
 | Método | Rota | Descrição |
 | --- | --- | --- |
+| `POST` | `/auth/login` | Autentica e cria a sessão |
+| `POST` | `/auth/logout` | Encerra a sessão |
+| `GET` | `/auth/me` | Usuário da sessão atual |
+| `POST` | `/auth/password` | Troca a própria senha |
 | `GET` | `/workflows` | Definição das duas trilhas e suas etapas |
 | `GET` | `/cases?type=&status=` | Lista casos (filtros opcionais) |
 | `POST` | `/cases` | Cria um caso (`type`: `CONTRATACAO` ou `NTT`) |
@@ -166,15 +180,25 @@ server/
     index.js              # Express: API + serve o build do frontend
     workflow.js           # Definição das duas trilhas e regras de transição
     db.js                 # Schema e conexão SQLite
+    auth.js               # Senhas (scrypt), sessões e middleware
     lib/emailParser.js    # Leitura de .msg e .eml + validação
     lib/ids.js            # Geração de IDs
-    routes/               # cases, emails, files, interviews
+    routes/               # auth, cases, emails, files, interviews
+  scripts/create-user.js  # CLI para criar usuário / redefinir senha
 client/
   src/
     App.jsx               # Quadro, trilhas e estado geral
     api.js                # Cliente HTTP
-    components/           # Board, CaseDetail, NewCaseModal
+    components/           # Board, CaseDetail, NewCaseModal, Login
+deploy/
+  workflow-ntt.service    # Serviço systemd
+  nginx.conf              # Proxy reverso + TLS
+  backup.sh               # Backup do banco e dos uploads
 ```
+
+## Deploy
+
+Guia completo para VPS com domínio e HTTPS: **[DEPLOY.md](DEPLOY.md)**.
 
 ## Próximos passos possíveis
 

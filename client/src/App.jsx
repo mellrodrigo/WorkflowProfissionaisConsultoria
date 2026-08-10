@@ -1,10 +1,13 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { api } from './api.js';
+import { api, setUnauthorizedHandler } from './api.js';
 import Board from './components/Board.jsx';
 import CaseDetail from './components/CaseDetail.jsx';
 import NewCaseModal from './components/NewCaseModal.jsx';
+import Login from './components/Login.jsx';
 
 export default function App() {
+  const [user, setUser] = useState(null);
+  const [checkingSession, setCheckingSession] = useState(true);
   const [workflows, setWorkflows] = useState(null);
   const [track, setTrack] = useState('CONTRATACAO');
   const [cases, setCases] = useState([]);
@@ -20,11 +23,29 @@ export default function App() {
     }
   }, [track]);
 
+  // Sessão expirada em qualquer chamada: volta à tela de login e limpa o estado.
   useEffect(() => {
-    api.workflows().then(setWorkflows).catch((e) => setError(e.message));
+    setUnauthorizedHandler(() => {
+      setUser(null);
+      setSelected(null);
+      setCases([]);
+    });
   }, []);
 
-  useEffect(() => { loadCases(track); }, [track, loadCases]);
+  // Verifica, na abertura, se já existe sessão ativa.
+  useEffect(() => {
+    api.me()
+      .then(setUser)
+      .catch(() => setUser(null))
+      .finally(() => setCheckingSession(false));
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    api.workflows().then(setWorkflows).catch((e) => setError(e.message));
+  }, [user]);
+
+  useEffect(() => { if (user) loadCases(track); }, [user, track, loadCases]);
 
   const openCase = async (id) => {
     try {
@@ -52,6 +73,19 @@ export default function App() {
     rejected: cases.filter((c) => c.status === 'rejected').length,
   };
 
+  if (checkingSession) return <div className="loading">Carregando…</div>;
+  if (!user) return <Login onLogged={setUser} />;
+
+  async function logout() {
+    try {
+      await api.logout();
+    } finally {
+      setUser(null);
+      setSelected(null);
+      setCases([]);
+    }
+  }
+
   return (
     <div className="app">
       <header>
@@ -59,7 +93,11 @@ export default function App() {
           <h1>Workflow de Entrada · NTT → Serasa</h1>
           <p>Gestão das etapas de entrevista, contratação e entrada do profissional</p>
         </div>
-        <button className="primary" onClick={() => setShowNew(true)}>+ Novo caso</button>
+        <div className="header-actions">
+          <span className="who">{user.name || user.username}</span>
+          <button className="ghost" onClick={logout}>Sair</button>
+          <button className="primary" onClick={() => setShowNew(true)}>+ Novo caso</button>
+        </div>
       </header>
 
       <nav className="tracks">
