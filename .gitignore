@@ -1,0 +1,13 @@
+node_modules/
+dist/
+
+# Banco de dados local e arquivos enviados (não versionar dados reais)
+server/data/
+server/uploads/
+
+# Logs e temporários
+*.log
+npm-debug.log*
+.DS_Store
+.env
+.env.local

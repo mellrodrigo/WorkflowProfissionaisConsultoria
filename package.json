@@ -1,0 +1,13 @@
+{
+  "name": "workflow-profissionais-consultoria",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Workflow de entrada de profissionais NTT na Serasa: contratação e alocação de profissional já contratado.",
+  "scripts": {
+    "install:all": "npm --prefix server install && npm --prefix client install",
+    "build": "npm --prefix client run build",
+    "start": "npm --prefix server start",
+    "dev:server": "npm --prefix server run dev",
+    "dev:client": "npm --prefix client run dev"
+  }
+}
