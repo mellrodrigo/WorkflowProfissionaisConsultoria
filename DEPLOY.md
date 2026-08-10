@@ -3,10 +3,10 @@
 Guia para publicar a aplicação em um VPS Ubuntu/Debian, com HTTPS e domínio próprio.
 Os comandos são para colar no terminal do VPS (console do hPanel ou SSH), na ordem.
 
-Ao longo do guia, substitua:
+O domínio deste projeto é **iadasilva.com.br** (com `www` redirecionando para ele),
+e os arquivos em `deploy/` já vêm preenchidos com esse valor.
 
-- `SEU_DOMINIO` → o domínio real (ex.: `workflow.suaempresa.com.br`)
-- `SEU_IP` → o IP do VPS
+Ao longo do guia, substitua `SEU_IP` pelo IP do VPS.
 
 > **Requisito**: Node.js 22 ou superior (a aplicação usa o SQLite embutido do Node).
 > Não funciona em hospedagem compartilhada — precisa ser VPS.
@@ -15,20 +15,35 @@ Ao longo do guia, substitua:
 
 ## 1. Apontar o domínio para o VPS
 
-Antes de tudo, no painel do seu domínio, crie um registro:
+Este é o passo que mais causa confusão na Hostinger: um domínio pode estar
+apontado para a **hospedagem compartilhada** em vez do **VPS**. Nesse caso a
+aplicação sobe normalmente no VPS, mas o site responde **403 Forbidden** — que é
+o compartilhado servindo um `public_html` vazio.
+
+Descubra o IP do VPS (no hPanel, em VPS → Visão geral) e compare com o que o
+domínio resolve hoje:
+
+```bash
+dig +short iadasilva.com.br A
+dig +short iadasilva.com.br AAAA
+```
+
+Se o resultado **não** for o IP do VPS, ajuste no painel de DNS do domínio:
 
 | Tipo | Nome | Valor |
 | --- | --- | --- |
-| `A` | `@` (ou o subdomínio) | `SEU_IP` |
+| `A` | `@` | IP **IPv4** do VPS |
+| `A` | `www` | IP **IPv4** do VPS |
+| `AAAA` | `@` | IP **IPv6** do VPS (se houver; caso contrário, remova o registro) |
+| `AAAA` | `www` | IP **IPv6** do VPS (idem) |
 
-A propagação leva de alguns minutos a algumas horas. Confirme com:
+> Um `AAAA` apontando para o servidor errado quebra o acesso mesmo com o `A`
+> correto, porque navegadores preferem IPv6. Se o VPS não tem IPv6, **apague**
+> os registros `AAAA` em vez de deixá-los apontando para outro lugar.
 
-```bash
-dig +short SEU_DOMINIO
-```
-
-Só siga para o passo 6 (SSL) quando esse comando retornar o IP do VPS — o
-certbot falha se o DNS ainda não estiver apontando.
+A propagação leva de minutos a algumas horas. Só siga para o passo 6 (SSL)
+quando os comandos acima retornarem o IP do VPS — o certbot falha se o domínio
+ainda estiver apontando para outro servidor.
 
 ---
 
@@ -157,34 +172,53 @@ journalctl -u workflow-ntt -f
 
 ## 6. nginx + HTTPS
 
+O arquivo já vem preenchido com `iadasilva.com.br`, não é preciso editar nada.
+
 ```bash
 cp /opt/workflow-ntt/deploy/nginx.conf /etc/nginx/sites-available/workflow-ntt
-
-# Troca o placeholder pelo domínio real
-sed -i 's/SEU_DOMINIO/workflow.suaempresa.com.br/g' /etc/nginx/sites-available/workflow-ntt
-
 ln -sf /etc/nginx/sites-available/workflow-ntt /etc/nginx/sites-enabled/
+
+# Remove o site padrão, que senão responde no lugar do nosso
 rm -f /etc/nginx/sites-enabled/default
 ```
 
-O arquivo já vem com o bloco HTTPS pronto, mas os certificados ainda não existem,
-então o nginx não vai validar. Emita o certificado primeiro:
+Os blocos HTTPS apontam para certificados que ainda não existem, então o
+`nginx -t` falharia agora. A sequência é: subir só o HTTP, emitir o certificado
+e então ligar o HTTPS.
 
 ```bash
-apt install -y certbot python3-certbot-nginx
-certbot --nginx -d SEU_DOMINIO
-```
+# 1. Comenta tudo a partir do primeiro bloco 443
+sed -i '/^# HTTPS no www/,$ s/^/#/' /etc/nginx/sites-available/workflow-ntt
 
-O certbot obtém o certificado, ajusta a configuração e programa a renovação
-automática. Depois:
-
-```bash
+mkdir -p /var/www/html
 nginx -t && systemctl reload nginx
 ```
 
-> Se o `nginx -t` reclamar de certificado inexistente antes de rodar o certbot,
-> comente temporariamente o bloco `server { listen 443 ... }` inteiro, rode o
-> certbot e descomente em seguida.
+Confirme que o HTTP está de pé antes de continuar — deve responder `301`:
+
+```bash
+curl -sI http://iadasilva.com.br | head -1
+```
+
+```bash
+# 2. Emite o certificado SEM deixar o certbot editar o nginx
+apt install -y certbot
+certbot certonly --webroot -w /var/www/html \
+  -d iadasilva.com.br -d www.iadasilva.com.br \
+  --deploy-hook "systemctl reload nginx"
+
+# 3. Liga o HTTPS
+sed -i '/^## HTTPS no www/,$ s/^#//' /etc/nginx/sites-available/workflow-ntt
+nginx -t && systemctl reload nginx
+```
+
+> Uso `certonly --webroot` de propósito, em vez de `certbot --nginx`: o modo
+> `--nginx` reescreve a configuração e criaria um bloco 443 próprio, que
+> conflitaria com os nossos ao serem reativados. O `--deploy-hook` recarrega o
+> nginx a cada renovação automática.
+
+> Se o certbot falhar com `Timeout` ou `unauthorized`, o domínio ainda não está
+> apontando para este servidor — volte ao passo 1.
 
 ---
 
@@ -203,7 +237,7 @@ A porta 4000 **não** deve aparecer na lista — o acesso a ela é só interno.
 
 ## 8. Conferir
 
-Abra `https://SEU_DOMINIO`. Deve aparecer a tela de login, com cadeado de HTTPS.
+Abra `https://iadasilva.com.br`. Deve aparecer a tela de login, com cadeado de HTTPS.
 Entre com o usuário criado no passo 4.
 
 Verificações de segurança que valem fazer uma vez:
@@ -213,7 +247,7 @@ Verificações de segurança que valem fazer uma vez:
 curl -m 5 http://SEU_IP:4000/api/health    # esperado: falhar/timeout
 
 # Sem sessão, a API deve recusar
-curl -s -o /dev/null -w '%{http_code}\n' https://SEU_DOMINIO/api/cases   # esperado: 401
+curl -s -o /dev/null -w '%{http_code}\n' https://iadasilva.com.br/api/cases   # esperado: 401
 ```
 
 ---
@@ -253,10 +287,51 @@ O banco é preservado — as tabelas são criadas com `IF NOT EXISTS`.
 
 ---
 
+## Diagnóstico de `403 Forbidden`
+
+**A aplicação nunca responde 403** — ela usa `401` para acesso negado. Um 403 no
+navegador vem sempre da camada web (nginx ou outro vhost), antes de chegar ao
+Node. Rode na ordem:
+
+```bash
+# 1. O Node está no ar?
+systemctl status workflow-ntt --no-pager | head -5
+curl -s -o /dev/null -w 'node local: %{http_code}\n' http://127.0.0.1:4000/api/health
+#    200 aqui = aplicação saudável, o problema é de roteamento
+
+# 2. Quem está atendendo as portas 80/443?
+systemctl is-active nginx apache2 lshttpd 2>/dev/null
+ss -tlnp | grep -E ':80 |:443 '
+
+# 3. O motivo exato costuma estar aqui
+tail -20 /var/log/nginx/error.log
+
+# 4. Qual vhost está ativo
+ls -l /etc/nginx/sites-enabled/
+nginx -T 2>/dev/null | grep -nE 'server_name|root |proxy_pass' | head -30
+
+# 5. O domínio aponta para ESTE servidor?
+curl -s ifconfig.me; echo '  <- IP real deste servidor'
+dig +short iadasilva.com.br A
+```
+
+Interpretação:
+
+| Achado | Causa | Correção |
+| --- | --- | --- |
+| Passo 5: IPs diferentes | Domínio aponta para a hospedagem compartilhada, não para o VPS | Passo 1 deste guia |
+| Passo 3: `directory index of ... is forbidden` | Outro vhost servindo pasta vazia | Remova/desative esse vhost e deixe só o `workflow-ntt` |
+| Passo 4: `default` em sites-enabled | Site padrão respondendo antes do nosso | `rm -f /etc/nginx/sites-enabled/default && systemctl reload nginx` |
+| Passo 2: `apache2`/`lshttpd` ativo | Outro servidor web ocupou as portas | Desative-o (`systemctl disable --now apache2`) ou migre a configuração para ele |
+| Passo 1: falha de conexão | Aplicação caída | `journalctl -u workflow-ntt -n 50` |
+
+---
+
 ## Problemas comuns
 
 | Sintoma | Causa provável | O que fazer |
 | --- | --- | --- |
+| `403 Forbidden` | Não vem da aplicação — outro vhost ou DNS errado | Ver a seção de diagnóstico acima |
 | `502 Bad Gateway` | Aplicação caiu | `systemctl status workflow-ntt` e `journalctl -u workflow-ntt -n 50` |
 | Login não permanece | Cookie `Secure` sem HTTPS | Conclua o passo 6; o site precisa abrir em `https://`. Só para teste sem certificado, use `SESSION_SECURE=false` |
 | Mudou variável e nada aconteceu | Serviço não reiniciado, ou `.env` no lugar errado | `systemctl restart workflow-ntt`; a configuração é lida de `/etc/workflow-ntt.env`, não de um `.env` no projeto |
