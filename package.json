@@ -4,10 +4,15 @@
   "private": true,
   "description": "Workflow de entrada de profissionais NTT na Serasa: contratação e alocação de profissional já contratado.",
   "scripts": {
-    "install:all": "npm --prefix server install && npm --prefix client install",
-    "build": "npm --prefix client run build",
+    "install:all": "npm --prefix server install && npm --prefix client install --include=dev",
+    "postinstall": "npm run install:all",
+    "build": "npm --prefix client install --include=dev && npm --prefix client run build",
     "start": "npm --prefix server start",
+    "create-user": "npm --prefix server run create-user --",
     "dev:server": "npm --prefix server run dev",
     "dev:client": "npm --prefix client run dev"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

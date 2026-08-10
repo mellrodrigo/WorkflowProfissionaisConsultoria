@@ -59,11 +59,18 @@ adduser --system --group --home /opt/workflow-ntt workflow
 git clone https://github.com/mellrodrigo/WorkflowProfissionaisConsultoria.git /opt/workflow-ntt
 cd /opt/workflow-ntt
 
-npm run install:all
-npm run build
+npm install     # instala server e client (via postinstall)
+npm run build   # gera o frontend
 
 chown -R workflow:workflow /opt/workflow-ntt
 ```
+
+> **Painéis de deploy automatizado** (como o da Hostinger) costumam rodar
+> `npm install` seguido de `npm run build` na raiz — os dois comandos acima.
+> Ambos já se viram sozinhos: o `postinstall` da raiz instala as dependências
+> de `server` e `client`, e o `build` garante as do `client` antes de compilar,
+> inclusive quando `NODE_ENV=production` (o Vite é uma devDependency e seria
+> ignorado por um `npm install` comum nesse modo).
 
 ---
 
@@ -255,6 +262,8 @@ O banco é preservado — as tabelas são criadas com `IF NOT EXISTS`.
 | Mudou variável e nada aconteceu | Serviço não reiniciado, ou `.env` no lugar errado | `systemctl restart workflow-ntt`; a configuração é lida de `/etc/workflow-ntt.env`, não de um `.env` no projeto |
 | `413 Request Entity Too Large` | Arquivo maior que o limite do nginx | Aumente `client_max_body_size` no nginx |
 | Erro de SQLite ao iniciar | Node abaixo da versão 22 | `node --version` e reinstale pelo passo 2 |
+| `vite: not found` no build | Dependências do client ausentes | Rode `npm install` na **raiz** do projeto: o `postinstall` instala server e client. O `npm run build` também instala sozinho. |
+| `Cannot find module 'express'` | Dependências do server ausentes | Mesma solução: `npm install` na raiz |
 | `permission denied` em uploads | Dono errado das pastas | `chown -R workflow:workflow /opt/workflow-ntt` |
 | Esqueceu a senha | — | Rode o comando do passo 4 novamente com o mesmo usuário |
 
