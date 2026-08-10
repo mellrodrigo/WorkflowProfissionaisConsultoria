@@ -86,6 +86,49 @@ Para cadastrar mais pessoas da equipe, repita trocando usuário, senha e nome.
 
 ## 5. Subir como serviço
 
+### Variáveis de ambiente
+
+São apenas quatro, e o serviço systemd já traz todas com os valores corretos de
+produção — **para um deploy padrão você não precisa configurar nada aqui**.
+
+| Variável | Padrão no serviço | Para que serve |
+| --- | --- | --- |
+| `NODE_ENV` | `production` | Liga o modo de produção: cookie de sessão com `Secure` (exige HTTPS) e CORS desativado, já que frontend e API ficam na mesma origem. |
+| `PORT` | `4000` | Porta da aplicação. Se mudar, ajuste também o `proxy_pass` no nginx. |
+| `HOST` | `127.0.0.1` | Interface de escuta. Em `127.0.0.1` só o nginx alcança a aplicação, e a porta não fica exposta pelo IP do servidor. |
+| `SESSION_SECURE` | *(não definida)* | Força a flag `Secure` do cookie. Sem ela, o valor acompanha o `NODE_ENV`, que é o comportamento desejado. |
+
+> A aplicação lê apenas variáveis de ambiente do processo — **não existe leitura
+> de arquivo `.env`**. Criar um `.env` na pasta do projeto não surte efeito; a
+> configuração vem do systemd.
+
+Para sobrescrever algum valor sem editar a unit, use o arquivo opcional:
+
+```bash
+cp /opt/workflow-ntt/deploy/workflow-ntt.env.example /etc/workflow-ntt.env
+nano /etc/workflow-ntt.env
+
+# O arquivo guarda configuração do serviço: restrinja a leitura
+chown root:workflow /etc/workflow-ntt.env
+chmod 640 /etc/workflow-ntt.env
+```
+
+O serviço lê esse caminho com `EnvironmentFile=-`, então ele é opcional (o `-`
+faz o systemd seguir em frente se o arquivo não existir) e, por vir depois dos
+padrões na unit, o que estiver nele prevalece.
+
+O formato é `CHAVE=valor`, uma por linha — **sem `export`, sem aspas e sem
+`${expansão}`**, que o systemd não interpreta.
+
+Depois de qualquer alteração no arquivo:
+
+```bash
+systemctl restart workflow-ntt
+systemctl show workflow-ntt -p Environment   # confere o que foi aplicado
+```
+
+### Instalar o serviço
+
 ```bash
 cp /opt/workflow-ntt/deploy/workflow-ntt.service /etc/systemd/system/
 systemctl daemon-reload
@@ -208,7 +251,8 @@ O banco é preservado — as tabelas são criadas com `IF NOT EXISTS`.
 | Sintoma | Causa provável | O que fazer |
 | --- | --- | --- |
 | `502 Bad Gateway` | Aplicação caiu | `systemctl status workflow-ntt` e `journalctl -u workflow-ntt -n 50` |
-| Login não permanece | Cookie `Secure` sem HTTPS | Conclua o passo 6; o site precisa abrir em `https://` |
+| Login não permanece | Cookie `Secure` sem HTTPS | Conclua o passo 6; o site precisa abrir em `https://`. Só para teste sem certificado, use `SESSION_SECURE=false` |
+| Mudou variável e nada aconteceu | Serviço não reiniciado, ou `.env` no lugar errado | `systemctl restart workflow-ntt`; a configuração é lida de `/etc/workflow-ntt.env`, não de um `.env` no projeto |
 | `413 Request Entity Too Large` | Arquivo maior que o limite do nginx | Aumente `client_max_body_size` no nginx |
 | Erro de SQLite ao iniciar | Node abaixo da versão 22 | `node --version` e reinstale pelo passo 2 |
 | `permission denied` em uploads | Dono errado das pastas | `chown -R workflow:workflow /opt/workflow-ntt` |

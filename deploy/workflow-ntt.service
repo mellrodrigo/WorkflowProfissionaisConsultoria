@@ -13,11 +13,17 @@ ExecStart=/usr/bin/node src/index.js
 Restart=always
 RestartSec=5
 
+# Padrões seguros embutidos: valem mesmo se o EnvironmentFile abaixo não existir.
 Environment=NODE_ENV=production
 Environment=PORT=4000
 
 # A aplicação escuta apenas em localhost; quem expõe para a internet é o nginx.
 Environment=HOST=127.0.0.1
+
+# Sobrescritas opcionais. O "-" faz o systemd ignorar o arquivo se ele não
+# existir, e por vir depois dos Environment= acima, o que estiver aqui vence.
+# Modelo em deploy/workflow-ntt.env.example
+EnvironmentFile=-/etc/workflow-ntt.env
 
 # Endurecimento: o processo só pode escrever nas pastas de dados e uploads.
 NoNewPrivileges=true
