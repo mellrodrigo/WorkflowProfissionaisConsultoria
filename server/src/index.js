@@ -33,11 +33,18 @@ app.use(express.json({ limit: '5mb' }));
 app.use(auth.attachUser);
 
 // --- Rotas públicas ---
-// A versão permite confirmar qual build está publicado sem acesso aos logs.
+// Diagnóstico sem depender de acesso aos logs, que muitas hospedagens não dão:
+// - version: confirma qual build está publicado;
+// - setup_required: indica que ainda não há nenhum usuário cadastrado, o que
+//   distingue "senha errada" de "acesso nunca criado" — a resposta do login é
+//   propositalmente igual nos dois casos.
+// Não revela nomes de usuário: quando não há nenhum, ninguém consegue entrar
+// de qualquer forma, e criar o primeiro acesso exige configurar o ambiente.
 const { version } = require('../package.json');
 app.get('/api/health', (_req, res) => res.json({
   ok: true,
   version,
+  setup_required: auth.countUsers() === 0,
   time: new Date().toISOString(),
 }));
 app.use('/api/auth', authRouter);
