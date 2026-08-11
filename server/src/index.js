@@ -58,11 +58,33 @@ app.use('/api', filesRouter);
 app.use('/api', emailsRouter);
 app.use('/api', interviewsRouter);
 
-// --- Frontend (build do client, se existir) ---
-const clientDist = path.join(__dirname, '..', '..', 'client', 'dist');
-if (fs.existsSync(clientDist)) {
+// --- Frontend (build do client) ---
+// O local do build varia conforme a estrutura do projeto: "client/dist" nesta
+// organização, "dist" na raiz em projetos Vite de pasta única, e assim por
+// diante. Procura nos caminhos usuais e aceita CLIENT_DIST para casos fora do
+// padrão. Sem isso, um caminho fixo errado faz o servidor subir sem servir a
+// interface, e toda rota que não é /api devolve 404.
+const root = path.join(__dirname, '..', '..');
+const candidates = [
+  process.env.CLIENT_DIST && path.resolve(process.env.CLIENT_DIST),
+  path.join(root, 'client', 'dist'),
+  path.join(root, 'dist'),
+  path.join(root, 'build'),
+  path.join(__dirname, '..', 'public'),
+].filter(Boolean);
+
+const clientDist = candidates.find((dir) => fs.existsSync(path.join(dir, 'index.html')));
+
+if (clientDist) {
+  console.log(`[web] Servindo o frontend de ${clientDist}`);
   app.use(express.static(clientDist));
   app.get(/^(?!\/api).*/, (_req, res) => res.sendFile(path.join(clientDist, 'index.html')));
+} else {
+  console.warn(
+    '[web] Build do frontend não encontrado. A API funciona, mas a interface não será servida.\n' +
+    '      Procurei em:\n' + candidates.map((c) => `        ${c}`).join('\n') + '\n' +
+    '      Rode o build do frontend ou defina CLIENT_DIST com o caminho correto.',
+  );
 }
 
 // Tratamento de erros (ex.: limite de upload do multer).
