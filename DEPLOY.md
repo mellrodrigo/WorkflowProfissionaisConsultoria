@@ -119,6 +119,21 @@ produção — **para um deploy padrão você não precisa configurar nada aqui*
 | `PORT` | `4000` | Porta da aplicação. Se mudar, ajuste também o `proxy_pass` no nginx. |
 | `HOST` | `127.0.0.1` | Interface de escuta. Em `127.0.0.1` só o nginx alcança a aplicação, e a porta não fica exposta pelo IP do servidor. |
 | `SESSION_SECURE` | *(não definida)* | Força a flag `Secure` do cookie. Sem ela, o valor acompanha o `NODE_ENV`, que é o comportamento desejado. |
+| `ADMIN_USERNAME` | *(não definida)* | Cria o primeiro acesso na inicialização, para hospedagens **sem terminal**. Ver abaixo. |
+| `ADMIN_PASSWORD` | *(não definida)* | Senha desse primeiro acesso (mínimo 8 caracteres). |
+| `ADMIN_NAME` | *(não definida)* | Nome exibido do primeiro acesso. Opcional. |
+
+### Primeiro acesso sem terminal
+
+Em hospedagens que só oferecem painel (sem SSH), não há como rodar
+`npm run create-user`. Nesse caso defina `ADMIN_USERNAME` e `ADMIN_PASSWORD`
+nas variáveis da aplicação e reinicie: o usuário é criado na inicialização.
+
+O seeding só age quando **não existe nenhum usuário**. Reiniciar não duplica o
+acesso, e trocar as variáveis por outro nome depois não cria um segundo usuário
+— ou seja, deixá-las configuradas não abre uma porta alternativa. Ainda assim,
+o recomendado é **remover `ADMIN_PASSWORD`** depois do primeiro login e trocar a
+senha pela própria aplicação.
 
 > A aplicação lê apenas variáveis de ambiente do processo — **não existe leitura
 > de arquivo `.env`**. Criar um `.env` na pasta do projeto não surte efeito; a

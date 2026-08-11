@@ -62,10 +62,14 @@ app.use((err, _req, res, _next) => {
 auth.purgeExpiredSessions();
 setInterval(auth.purgeExpiredSessions, 6 * 60 * 60 * 1000).unref();
 
+// Em hospedagens sem terminal, o primeiro acesso vem de ADMIN_USERNAME/ADMIN_PASSWORD.
+auth.seedInitialUser();
+
 if (auth.countUsers() === 0) {
   console.warn(
-    '\n[atenção] Nenhum usuário cadastrado. Crie o primeiro acesso com:\n' +
-    '  npm run create-user -- <usuario> <senha> "<nome>"\n',
+    '\n[atenção] Nenhum usuário cadastrado. Crie o primeiro acesso de uma destas formas:\n' +
+    '  - com terminal:  npm run create-user -- <usuario> <senha> "<nome>"\n' +
+    '  - sem terminal:  defina ADMIN_USERNAME e ADMIN_PASSWORD e reinicie\n',
   );
 }
 

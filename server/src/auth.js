@@ -154,6 +154,29 @@ function countUsers() {
   return db.prepare('SELECT COUNT(*) AS n FROM users').get().n;
 }
 
+// Cria o primeiro acesso a partir de variáveis de ambiente.
+// Serve para hospedagens sem terminal, onde não dá para rodar o create-user.
+// Só age quando ainda não existe nenhum usuário, então reinícios não
+// sobrescrevem nada nem restauram um acesso removido de propósito.
+function seedInitialUser() {
+  const username = process.env.ADMIN_USERNAME;
+  const password = process.env.ADMIN_PASSWORD;
+  if (!username || !password) return null;
+  if (countUsers() > 0) return null;
+
+  if (password.length < 8) {
+    console.error('[auth] ADMIN_PASSWORD tem menos de 8 caracteres. Usuário inicial não criado.');
+    return null;
+  }
+
+  createUser(username, password, process.env.ADMIN_NAME || username);
+  console.log(
+    `[auth] Usuário inicial "${username}" criado a partir das variáveis de ambiente.\n` +
+    '[auth] Remova ADMIN_PASSWORD da configuração e troque a senha pela aplicação.',
+  );
+  return username;
+}
+
 module.exports = {
   COOKIE_NAME,
   hashPassword,
@@ -170,4 +193,5 @@ module.exports = {
   setPassword,
   findUser,
   countUsers,
+  seedInitialUser,
 };
