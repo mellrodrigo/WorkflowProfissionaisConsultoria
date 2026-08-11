@@ -133,21 +133,26 @@ function requireAuth(req, res, next) {
 
 function createUser(username, password, name) {
   const id = newId('user_');
+  const login = String(username).trim();
   db.prepare(`
     INSERT INTO users (id, username, password_hash, name, created_at)
     VALUES (?, ?, ?, ?, ?)
-  `).run(id, username, hashPassword(password), name || username, nowIso());
-  return { id, username, name: name || username };
+  `).run(id, login, hashPassword(password), name || login, nowIso());
+  return { id, username: login, name: name || login };
 }
 
 function setPassword(username, password) {
-  const res = db.prepare('UPDATE users SET password_hash = ? WHERE username = ?')
-    .run(hashPassword(password), username);
+  const res = db.prepare('UPDATE users SET password_hash = ? WHERE username = ? COLLATE NOCASE')
+    .run(hashPassword(password), String(username).trim());
   return res.changes > 0;
 }
 
+// Busca sem diferenciar maiúsculas de minúsculas: um usuário cadastrado como
+// "Rodrigo" entra digitando "rodrigo". Evita um "senha inválida" enganoso.
 function findUser(username) {
-  return db.prepare('SELECT * FROM users WHERE username = ?').get(username);
+  if (!username) return undefined;
+  return db.prepare('SELECT * FROM users WHERE username = ? COLLATE NOCASE')
+    .get(String(username).trim());
 }
 
 function countUsers() {
@@ -159,14 +164,26 @@ function countUsers() {
 // Só age quando ainda não existe nenhum usuário, então reinícios não
 // sobrescrevem nada nem restauram um acesso removido de propósito.
 function seedInitialUser() {
-  const username = process.env.ADMIN_USERNAME;
-  const password = process.env.ADMIN_PASSWORD;
+  const username = (process.env.ADMIN_USERNAME || '').trim();
+  const password = process.env.ADMIN_PASSWORD || '';
   if (!username || !password) return null;
   if (countUsers() > 0) return null;
 
   if (password.length < 8) {
     console.error('[auth] ADMIN_PASSWORD tem menos de 8 caracteres. Usuário inicial não criado.');
     return null;
+  }
+
+  // Painéis costumam gravar o valor com as aspas junto; a senha passa a conter
+  // os caracteres de aspas e o login falha sem explicação aparente.
+  if (/^(".*"|'.*')$/.test(password)) {
+    console.warn(
+      '[auth] ADMIN_PASSWORD parece incluir aspas no valor. A senha gravada contém as aspas — ' +
+      'remova-as na configuração se o login falhar.',
+    );
+  }
+  if (password !== password.trim()) {
+    console.warn('[auth] ADMIN_PASSWORD tem espaço no início ou no fim; ele faz parte da senha.');
   }
 
   createUser(username, password, process.env.ADMIN_NAME || username);
