@@ -33,7 +33,13 @@ app.use(express.json({ limit: '5mb' }));
 app.use(auth.attachUser);
 
 // --- Rotas públicas ---
-app.get('/api/health', (_req, res) => res.json({ ok: true, time: new Date().toISOString() }));
+// A versão permite confirmar qual build está publicado sem acesso aos logs.
+const { version } = require('../package.json');
+app.get('/api/health', (_req, res) => res.json({
+  ok: true,
+  version,
+  time: new Date().toISOString(),
+}));
 app.use('/api/auth', authRouter);
 
 // --- Daqui em diante, tudo exige sessão válida ---
