@@ -4,6 +4,7 @@ import Board from './components/Board.jsx';
 import CaseDetail from './components/CaseDetail.jsx';
 import NewCaseModal from './components/NewCaseModal.jsx';
 import Login from './components/Login.jsx';
+import ChangePassword from './components/ChangePassword.jsx';
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -13,6 +14,7 @@ export default function App() {
   const [cases, setCases] = useState([]);
   const [selected, setSelected] = useState(null);
   const [showNew, setShowNew] = useState(false);
+  const [showPwd, setShowPwd] = useState(false);
   const [error, setError] = useState('');
 
   const loadCases = useCallback(async (t = track) => {
@@ -95,6 +97,7 @@ export default function App() {
         </div>
         <div className="header-actions">
           <span className="who">{user.name || user.username}</span>
+          <button className="ghost" onClick={() => setShowPwd(true)}>Trocar senha</button>
           <button className="ghost" onClick={logout}>Sair</button>
           <button className="primary" onClick={() => setShowNew(true)}>+ Novo caso</button>
         </div>
@@ -130,6 +133,8 @@ export default function App() {
           }}
         />
       )}
+
+      {showPwd && <ChangePassword onClose={() => setShowPwd(false)} />}
 
       {selected && workflows && (
         <CaseDetail
